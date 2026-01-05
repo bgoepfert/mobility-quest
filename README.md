@@ -1,6 +1,6 @@
 # 🚀 Welcome to Mobility Quest!
 
-## My personal daily movement habit tracker
+**My personal daily movement habit tracker**
 
 ### 🚀 Quick Start
 
