@@ -1,4 +1,4 @@
-# 🚀 Welcome to Mobility Quest!
+# Welcome to Mobility Quest!
 
 **My personal daily movement habit tracker**
 
