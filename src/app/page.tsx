@@ -2,7 +2,12 @@
 
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { getStorage, setStorage, STORAGE_KEYS } from "@/lib/storage";
+import {
+  getStorage,
+  setStorage,
+  removeStorage,
+  STORAGE_KEYS,
+} from "@/lib/storage";
 
 interface Exercise {
   id: string;
@@ -29,6 +34,11 @@ interface UserProfile {
   streak: number;
   longestStreak: number;
   totalRoutinesCompleted: number;
+}
+
+interface NotificationSettings {
+  morningReminder: string;
+  nightReminder: string;
 }
 
 const MORNING_ROUTINE: Routine = {
@@ -240,6 +250,14 @@ const ACHIEVEMENTS = [
   },
   {
     id: "a7",
+    name: "Habit Creator",
+    description: "Maintain a 30-day streak",
+    icon: "🌟",
+    points: 300,
+    unlocked: false,
+  },
+  {
+    id: "a8",
     name: "Mobility Master",
     description: "Reach Level 10",
     icon: "👑",
@@ -247,6 +265,115 @@ const ACHIEVEMENTS = [
     unlocked: false,
   },
 ];
+
+function getTodayDateString(): string {
+  const today = new Date();
+  return today.toISOString().split("T")[0];
+}
+
+function calculateStreak(dailyCompletions: string[]): number {
+  if (dailyCompletions.length === 0) return 0;
+
+  const sortedDates = [...dailyCompletions].sort((a, b) => b.localeCompare(a));
+  const today = getTodayDateString();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+  if (!sortedDates.includes(today) && !sortedDates.includes(yesterdayStr)) {
+    return 0;
+  }
+
+  let streak = 0;
+  let startDate = new Date(today);
+
+  if (!sortedDates.includes(today) && sortedDates.includes(yesterdayStr)) {
+    startDate = new Date(yesterday);
+  }
+
+  for (let i = 0; i < 365; i++) {
+    const dateStr = startDate.toISOString().split("T")[0];
+    if (sortedDates.includes(dateStr)) {
+      streak++;
+      startDate.setDate(startDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+}
+
+function getRoutineTypeFromId(routineId: string): "morning" | "night" | null {
+  if (routineId.startsWith("morning")) return "morning";
+  if (routineId.startsWith("night")) return "night";
+  return null;
+}
+
+function calculateRoutineStreak(
+  completions: Array<{
+    routineId: string;
+    completedAt: string;
+  }>,
+  routineType: "morning" | "night"
+): number {
+  const routineCompletions = completions
+    .filter((c) => getRoutineTypeFromId(c.routineId) === routineType)
+    .map((c) => c.completedAt.split("T")[0])
+    .filter((date, index, self) => self.indexOf(date) === index);
+
+  if (routineCompletions.length === 0) return 0;
+
+  const sortedDates = [...routineCompletions].sort((a, b) =>
+    b.localeCompare(a)
+  );
+  const today = getTodayDateString();
+  const yesterday = new Date();
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = yesterday.toISOString().split("T")[0];
+
+  if (!sortedDates.includes(today) && !sortedDates.includes(yesterdayStr)) {
+    return 0;
+  }
+
+  let streak = 0;
+  let startDate = new Date(today);
+
+  if (!sortedDates.includes(today) && sortedDates.includes(yesterdayStr)) {
+    startDate = new Date(yesterday);
+  }
+
+  for (let i = 0; i < 365; i++) {
+    const dateStr = startDate.toISOString().split("T")[0];
+    if (sortedDates.includes(dateStr)) {
+      streak++;
+      startDate.setDate(startDate.getDate() - 1);
+    } else {
+      break;
+    }
+  }
+
+  return streak;
+}
+
+function hasPerfectDay(
+  completions: Array<{
+    routineId: string;
+    completedAt: string;
+  }>,
+  date: string
+): boolean {
+  const dayCompletions = completions.filter(
+    (c) => c.completedAt.split("T")[0] === date
+  );
+  const hasMorning = dayCompletions.some(
+    (c) => getRoutineTypeFromId(c.routineId) === "morning"
+  );
+  const hasNight = dayCompletions.some(
+    (c) => getRoutineTypeFromId(c.routineId) === "night"
+  );
+  return hasMorning && hasNight;
+}
 
 export default function HabitTrackerPage() {
   const [activeRoutine, setActiveRoutine] = useState<Routine | null>(null);
@@ -272,6 +399,12 @@ export default function HabitTrackerPage() {
   const [showLevelUp, setShowLevelUp] = useState<boolean>(false);
   const [activeTab, setActiveTab] = useState<"morning" | "night">("morning");
   const [isInitialized, setIsInitialized] = useState<boolean>(false);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [notificationSettings, setNotificationSettings] =
+    useState<NotificationSettings>({
+      morningReminder: "08:00",
+      nightReminder: "20:00",
+    });
 
   useEffect(() => {
     const storedRoutines = getStorage<{ morning: Routine; night: Routine }>(
@@ -289,11 +422,30 @@ export default function HabitTrackerPage() {
       STORAGE_KEYS.ACHIEVEMENTS,
       ACHIEVEMENTS
     );
+    const storedNotifications = getStorage<NotificationSettings>(
+      STORAGE_KEYS.NOTIFICATIONS,
+      {
+        morningReminder: "08:00",
+        nightReminder: "20:00",
+      }
+    );
+    const dailyCompletions = getStorage<string[]>(
+      STORAGE_KEYS.DAILY_COMPLETIONS,
+      []
+    );
+
+    const currentStreak = calculateStreak(dailyCompletions);
+    const updatedProfile = {
+      ...storedProfile,
+      streak: currentStreak,
+      longestStreak: Math.max(storedProfile.longestStreak, currentStreak),
+    };
 
     setMorningRoutine(storedRoutines.morning);
     setNightRoutine(storedRoutines.night);
-    setUserProfile(storedProfile);
+    setUserProfile(updatedProfile);
     setAchievements(storedAchievements);
+    setNotificationSettings(storedNotifications);
     setIsInitialized(true);
   }, []);
 
@@ -314,6 +466,101 @@ export default function HabitTrackerPage() {
     if (!isInitialized) return;
     setStorage(STORAGE_KEYS.ACHIEVEMENTS, achievements);
   }, [achievements, isInitialized]);
+
+  useEffect(() => {
+    if (!isInitialized) return;
+    setStorage(STORAGE_KEYS.NOTIFICATIONS, notificationSettings);
+  }, [notificationSettings, isInitialized]);
+
+  useEffect(() => {
+    if (!isInitialized || typeof window === "undefined") return;
+
+    if (!("Notification" in window)) {
+      return;
+    }
+
+    const showNotification = (
+      reminderTime: string,
+      routineType: "morning" | "night"
+    ) => {
+      if (Notification.permission !== "granted") {
+        return;
+      }
+
+      try {
+        const routineName =
+          routineType === "morning" ? "Morning Quest" : "Night Quest";
+        const notification = new Notification("Mobility Quest Reminder", {
+          body: `Time for your ${routineName}! Let's keep that streak going! 🔥`,
+          icon: "/favicon-32x32.png",
+          tag: `mobility-quest-${routineType}`,
+          requireInteraction: true,
+        });
+
+        notification.onclick = () => {
+          window.focus();
+          notification.close();
+        };
+      } catch (error) {
+        console.error("Failed to create notification:", error);
+      }
+    };
+
+    const checkAndShowNotification = (
+      reminderTime: string,
+      routineType: "morning" | "night"
+    ) => {
+      if (Notification.permission !== "granted") {
+        return;
+      }
+
+      const [hours, minutes] = reminderTime.split(":").map(Number);
+      const now = new Date();
+      const reminderDate = new Date(now);
+      reminderDate.setHours(hours, minutes, 0, 0);
+
+      const nowTime = now.getTime();
+      const reminderTimeMs = reminderDate.getTime();
+
+      if (nowTime >= reminderTimeMs) {
+        showNotification(reminderTime, routineType);
+      }
+    };
+
+    const checkNotifications = () => {
+      if (Notification.permission === "granted") {
+        checkAndShowNotification(
+          notificationSettings.morningReminder,
+          "morning"
+        );
+        checkAndShowNotification(notificationSettings.nightReminder, "night");
+      }
+    };
+
+    const initializeNotifications = () => {
+      if (Notification.permission === "default") {
+        Notification.requestPermission().then((permission) => {
+          if (permission === "granted") {
+            setTimeout(() => {
+              checkNotifications();
+            }, 1000);
+          }
+        });
+      } else if (Notification.permission === "granted") {
+        setTimeout(() => {
+          checkNotifications();
+        }, 1000);
+      }
+    };
+
+    initializeNotifications();
+
+    const interval = setInterval(() => {
+      checkNotifications();
+    }, 60000);
+
+    return () => clearInterval(interval);
+  }, [isInitialized, notificationSettings]);
 
   // Timer effect
   useEffect(() => {
@@ -414,7 +661,18 @@ export default function HabitTrackerPage() {
   };
 
   const handleRoutineComplete = (routine: Routine) => {
-    const newStreak = userProfile.streak + 1;
+    const today = getTodayDateString();
+    const dailyCompletions = getStorage<string[]>(
+      STORAGE_KEYS.DAILY_COMPLETIONS,
+      []
+    );
+
+    if (!dailyCompletions.includes(today)) {
+      dailyCompletions.push(today);
+      setStorage(STORAGE_KEYS.DAILY_COMPLETIONS, dailyCompletions);
+    }
+
+    const newStreak = calculateStreak(dailyCompletions);
     const newProfile = {
       ...userProfile,
       totalRoutinesCompleted: userProfile.totalRoutinesCompleted + 1,
@@ -461,15 +719,40 @@ export default function HabitTrackerPage() {
       currentMorning.exercises.filter((e) => e.completed).length +
       currentNight.exercises.filter((e) => e.completed).length;
 
+    const completions = getStorage<
+      Array<{
+        routineId: string;
+        exerciseIds: string[];
+        points: number;
+        completedAt: string;
+      }>
+    >(STORAGE_KEYS.COMPLETIONS, []);
+
+    const morningStreak = calculateRoutineStreak(completions, "morning");
+    const nightStreak = calculateRoutineStreak(completions, "night");
+
+    const allDates = completions
+      .map((c) => c.completedAt.split("T")[0])
+      .filter((date, index, self) => self.indexOf(date) === index);
+    const hasAnyPerfectDay = allDates.some((date) =>
+      hasPerfectDay(completions, date)
+    );
+
     setAchievements((prev) =>
       prev.map((a) => {
         if (a.id === "a1" && totalExercisesCompleted >= 1)
           return { ...a, unlocked: true };
-        if (a.id === "a6" && totalExercisesCompleted >= 100)
+        if (a.id === "a2" && morningStreak >= 3)
           return { ...a, unlocked: true };
+        if (a.id === "a3" && nightStreak >= 3) return { ...a, unlocked: true };
         if (a.id === "a4" && userProfile.streak >= 7)
           return { ...a, unlocked: true };
-        if (a.id === "a7" && userProfile.level >= 10)
+        if (a.id === "a5" && hasAnyPerfectDay) return { ...a, unlocked: true };
+        if (a.id === "a6" && totalExercisesCompleted >= 100)
+          return { ...a, unlocked: true };
+        if (a.id === "a7" && userProfile.streak >= 30)
+          return { ...a, unlocked: true };
+        if (a.id === "a8" && userProfile.level >= 10)
           return { ...a, unlocked: true };
         return a;
       })
@@ -498,6 +781,53 @@ export default function HabitTrackerPage() {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
+  const handleResetProgress = () => {
+    if (
+      !confirm(
+        "Are you sure you want to reset all progress? This cannot be undone!"
+      )
+    ) {
+      return;
+    }
+
+    removeStorage(STORAGE_KEYS.PROFILE);
+    removeStorage(STORAGE_KEYS.ACHIEVEMENTS);
+    removeStorage(STORAGE_KEYS.COMPLETIONS);
+    removeStorage(STORAGE_KEYS.DAILY_COMPLETIONS);
+
+    setUserProfile({
+      totalPoints: 0,
+      level: 1,
+      streak: 0,
+      longestStreak: 0,
+      totalRoutinesCompleted: 0,
+    });
+
+    setAchievements(ACHIEVEMENTS);
+
+    const resetMorningRoutine = {
+      ...MORNING_ROUTINE,
+      exercises: MORNING_ROUTINE.exercises.map((e) => ({
+        ...e,
+        completed: false,
+      })),
+    };
+    const resetNightRoutine = {
+      ...NIGHT_ROUTINE,
+      exercises: NIGHT_ROUTINE.exercises.map((e) => ({
+        ...e,
+        completed: false,
+      })),
+    };
+
+    setMorningRoutine(resetMorningRoutine);
+    setNightRoutine(resetNightRoutine);
+    setStorage(STORAGE_KEYS.ROUTINES, {
+      morning: resetMorningRoutine,
+      night: resetNightRoutine,
+    });
+  };
+
   const nextLevelPoints = userProfile.level * 100;
   const progressToNextLevel = ((userProfile.totalPoints % 100) / 100) * 100;
 
@@ -506,15 +836,26 @@ export default function HabitTrackerPage() {
       {/* Scanline effect overlay */}
       <div className="fixed inset-0 pointer-events-none opacity-5 bg-[ repeating-linear-gradient(0deg,transparent,transparent_2px,#000_2px,#000_4px) ]" />
 
-      <main className="flex-1 container mx-auto px-4 py-8 max-w-6xl">
-        <div className="space-y-6">
+      <main className="flex-1 container mx-auto px-4 py-8 max-w-6xl overflow-x-hidden">
+        <div className="space-y-6 w-full">
           {/* Pixel Art Header */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="text-center space-y-2"
+            className="text-center space-y-2 relative pr-14 md:pr-20"
           >
+            <motion.button
+              whileHover={{ scale: 1.1 }}
+              whileTap={{ scale: 0.9 }}
+              onClick={() => setShowSettings(true)}
+              className="absolute top-0 right-0 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-xl md:text-3xl"
+              style={{
+                fontFamily: '"Press Start 2P", monospace',
+              }}
+            >
+              ⚙️
+            </motion.button>
             <h1
               className="text-4xl md:text-6xl font-black text-[#00ff41] tracking-wider"
               style={{
@@ -959,6 +1300,110 @@ export default function HabitTrackerPage() {
         )}
       </AnimatePresence>
 
+      {/* Settings Modal */}
+      <AnimatePresence>
+        {showSettings && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm"
+            onClick={() => setShowSettings(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.9, y: 20 }}
+              className="w-full max-w-md border-4 border-[#ffd700] bg-[#0d0d1a] p-6"
+              style={{
+                boxShadow: "12px 12px 0px #ffd700, 16px 16px 0px #6c3483",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-6">
+                <h2
+                  className="text-2xl text-[#ffd700]"
+                  style={{ fontFamily: '"Press Start 2P", monospace' }}
+                >
+                  SETTINGS
+                </h2>
+                <motion.button
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                  onClick={() => setShowSettings(false)}
+                  className="w-8 h-8 border-2 border-[#ffd700] bg-[#0d0d1a] text-[#ffd700] flex items-center justify-center text-lg"
+                  style={{
+                    fontFamily: '"Press Start 2P", monospace',
+                    boxShadow: "2px 2px 0px #ffd700",
+                  }}
+                >
+                  ✕
+                </motion.button>
+              </div>
+
+              <div className="space-y-6">
+                <div>
+                  <label
+                    className="block text-sm text-[#ffd700] mb-2"
+                    style={{ fontFamily: '"Press Start 2P", monospace' }}
+                  >
+                    MORNING QUEST REMINDER
+                  </label>
+                  <input
+                    type="time"
+                    value={notificationSettings.morningReminder}
+                    onChange={(e) =>
+                      setNotificationSettings((prev) => ({
+                        ...prev,
+                        morningReminder: e.target.value,
+                      }))
+                    }
+                    className="w-full p-3 border-4 border-[#00ff41] bg-[#0d0d1a] text-[#00ff41]"
+                    style={{
+                      fontFamily: '"Press Start 2P", monospace',
+                      boxShadow: "4px 4px 0px #006633",
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label
+                    className="block text-sm text-[#ffd700] mb-2"
+                    style={{ fontFamily: '"Press Start 2P", monospace' }}
+                  >
+                    NIGHT QUEST REMINDER
+                  </label>
+                  <input
+                    type="time"
+                    value={notificationSettings.nightReminder}
+                    onChange={(e) =>
+                      setNotificationSettings((prev) => ({
+                        ...prev,
+                        nightReminder: e.target.value,
+                      }))
+                    }
+                    className="w-full p-3 border-4 border-[#4ecdc4] bg-[#0d0d1a] text-[#4ecdc4]"
+                    style={{
+                      fontFamily: '"Press Start 2P", monospace',
+                      boxShadow: "4px 4px 0px #006666",
+                    }}
+                  />
+                </div>
+
+                <div className="pt-4 border-t-2 border-[#333]">
+                  <PixelButton
+                    onClick={handleResetProgress}
+                    variant="close"
+                    label="RESET PROGRESS"
+                    fullWidth
+                  />
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <footer className="mt-auto py-4 text-center text-[#888] border-t-2 border-[#333] bg-[#0d0d1a]">
         <div
           className="text-xs"
@@ -983,7 +1428,7 @@ function RoutineCard({
 
   return (
     <div
-      className="border-4 border-[#4ecdc4] bg-[#0d0d1a] p-4"
+      className="border-4 border-[#4ecdc4] bg-[#0d0d1a] p-4 w-full overflow-x-hidden"
       style={{ boxShadow: "8px 8px 0px #4ecdc4" }}
     >
       <div className="flex items-center justify-between mb-4">
@@ -1016,14 +1461,12 @@ function RoutineCard({
 
       {/* Exercise List */}
       <div
-        className="space-y-2 max-h-[500px] overflow-y-auto pr-2"
+        className="space-y-2 max-h-[500px] overflow-y-auto overflow-x-hidden pr-2 w-full"
         style={{ scrollbarWidth: "thin", scrollbarColor: "#4ecdc4 #0d0d1a" }}
       >
         {routine.exercises.map((exercise, index) => (
           <motion.div
             key={exercise.id}
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.98 }}
             className={`p-3 border-2 transition-all ${
               exercise.completed
                 ? "border-[#00ff41] bg-[#1a1a2e]"
@@ -1035,8 +1478,8 @@ function RoutineCard({
                 : "4px 4px 0px #333",
             }}
           >
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1">
+            <div className="flex items-start justify-between gap-3 w-full min-w-0">
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   {exercise.completed ? (
                     <div className="w-6 h-6 flex items-center justify-center bg-[#00ff41] text-[#0d0d1a] text-sm font-bold">
@@ -1046,7 +1489,7 @@ function RoutineCard({
                     <div className="w-6 h-6 border-2 border-[#555]" />
                   )}
                   <span
-                    className={`text-sm ${
+                    className={`text-sm truncate ${
                       exercise.completed ? "text-[#00ff41]" : "text-[#ddd]"
                     }`}
                     style={{ fontFamily: '"Press Start 2P", monospace' }}
@@ -1055,7 +1498,7 @@ function RoutineCard({
                   </span>
                 </div>
 
-                <p className="text-xs text-[#888] line-clamp-2 mb-2">
+                <p className="text-xs text-[#888] line-clamp-2 mb-2 break-words">
                   {exercise.description}
                 </p>
 
