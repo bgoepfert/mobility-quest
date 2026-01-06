@@ -41,6 +41,11 @@ interface NotificationSettings {
   nightReminder: string;
 }
 
+interface NotificationState {
+  morningLastShown: string | null;
+  nightLastShown: string | null;
+}
+
 const MORNING_ROUTINE: Routine = {
   id: "morning-1",
   name: "Morning Quest",
@@ -425,8 +430,8 @@ export default function HabitTrackerPage() {
     const storedNotifications = getStorage<NotificationSettings>(
       STORAGE_KEYS.NOTIFICATIONS,
       {
-        morningReminder: "08:00",
-        nightReminder: "20:00",
+        morningReminder: "10:00",
+        nightReminder: "19:00",
       }
     );
     const dailyCompletions = getStorage<string[]>(
@@ -479,10 +484,7 @@ export default function HabitTrackerPage() {
       return;
     }
 
-    const showNotification = (
-      reminderTime: string,
-      routineType: "morning" | "night"
-    ) => {
+    const showNotification = (routineType: "morning" | "night") => {
       if (Notification.permission !== "granted") {
         return;
       }
@@ -514,6 +516,19 @@ export default function HabitTrackerPage() {
         return;
       }
 
+      const notificationState = getStorage<NotificationState>(
+        STORAGE_KEYS.NOTIFICATION_STATE,
+        { morningLastShown: null, nightLastShown: null }
+      );
+
+      const today = getTodayDateString();
+      const lastShownKey =
+        routineType === "morning" ? "morningLastShown" : "nightLastShown";
+
+      if (notificationState[lastShownKey] === today) {
+        return;
+      }
+
       const [hours, minutes] = reminderTime.split(":").map(Number);
       const now = new Date();
       const reminderDate = new Date(now);
@@ -523,7 +538,12 @@ export default function HabitTrackerPage() {
       const reminderTimeMs = reminderDate.getTime();
 
       if (nowTime >= reminderTimeMs) {
-        showNotification(reminderTime, routineType);
+        showNotification(routineType);
+        const updatedState: NotificationState = {
+          ...notificationState,
+          [lastShownKey]: today,
+        };
+        setStorage(STORAGE_KEYS.NOTIFICATION_STATE, updatedState);
       }
     };
 
@@ -967,7 +987,7 @@ export default function HabitTrackerPage() {
                   initial={{ width: 0 }}
                   animate={{ width: `${progressToNextLevel}%` }}
                   transition={{ duration: 0.5 }}
-                  className="h-full bg-gradient-to-r from-[#006633] to-[#00ff41] relative"
+                  className="h-full bg-linear-to-r from-[#006633] to-[#00ff41] relative"
                   style={{
                     boxShadow: "inset 0 0 10px rgba(0,255,65,0.5)",
                   }}
@@ -1498,7 +1518,7 @@ function RoutineCard({
                   </span>
                 </div>
 
-                <p className="text-xs text-[#888] line-clamp-2 mb-2 break-words">
+                <p className="text-xs text-[#888] line-clamp-2 mb-2 wrap-break-word">
                   {exercise.description}
                 </p>
 

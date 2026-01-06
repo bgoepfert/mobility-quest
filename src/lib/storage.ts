@@ -5,6 +5,7 @@ const STORAGE_KEYS = {
   COMPLETIONS: 'mobility-quest-completions',
   NOTIFICATIONS: 'mobility-quest-notifications',
   DAILY_COMPLETIONS: 'mobility-quest-daily-completions',
+  NOTIFICATION_STATE: 'mobility-quest-notification-state',
 } as const;
 
 export function getStorage<T>(key: string, defaultValue: T): T {
