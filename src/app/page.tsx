@@ -873,25 +873,25 @@ export default function HabitTrackerPage() {
       <div className="fixed inset-0 pointer-events-none opacity-5 bg-[ repeating-linear-gradient(0deg,transparent,transparent_2px,#000_2px,#000_4px) ]" />
 
       <main className="flex-1 container mx-auto px-4 py-8 max-w-6xl overflow-x-hidden">
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => setShowSettings(true)}
+          className="absolute top-0 right-0 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-xl md:text-3xl"
+          style={{
+            fontFamily: '"Press Start 2P", monospace',
+          }}
+        >
+          ⚙️
+        </motion.button>
         <div className="space-y-6 w-full">
           {/* Pixel Art Header */}
           <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
-            className="text-center space-y-2 relative pr-14 md:pr-20"
+            className="text-center space-y-2 relative"
           >
-            <motion.button
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-              onClick={() => setShowSettings(true)}
-              className="absolute top-0 right-0 w-10 h-10 md:w-12 md:h-12 flex items-center justify-center text-xl md:text-3xl"
-              style={{
-                fontFamily: '"Press Start 2P", monospace',
-              }}
-            >
-              ⚙️
-            </motion.button>
             <h1
               className="text-4xl md:text-6xl font-black text-[#00ff41] tracking-wider"
               style={{
