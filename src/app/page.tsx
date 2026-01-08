@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   getStorage,
@@ -388,6 +388,7 @@ export default function HabitTrackerPage() {
   const [currentSide, setCurrentSide] = useState<"left" | "right" | "both">(
     "both"
   );
+  const currentSideRef = useRef<"left" | "right" | "both">("both");
   const [sideTimeRemaining, setSideTimeRemaining] = useState<number>(0);
   const [morningRoutine, setMorningRoutine] =
     useState<Routine>(MORNING_ROUTINE);
@@ -592,7 +593,17 @@ export default function HabitTrackerPage() {
           activeRoutine &&
           activeRoutine.exercises[currentExerciseIndex].isSided
         ) {
-          setSideTimeRemaining((prev) => Math.max(0, prev - 1));
+          const current = currentSideRef.current;
+          const exercise = activeRoutine.exercises[currentExerciseIndex];
+          setSideTimeRemaining((prev) => {
+            const newTime = Math.max(0, prev - 1);
+            if (newTime === 0 && current === "left") {
+              setCurrentSide("right");
+              currentSideRef.current = "right";
+              return exercise.duration / 2;
+            }
+            return newTime;
+          });
         }
       }, 1000);
     } else if (timeRemaining === 0 && isPlaying) {
@@ -610,9 +621,11 @@ export default function HabitTrackerPage() {
     const exercise = routine.exercises[index];
     if (exercise.isSided) {
       setCurrentSide("left");
+      currentSideRef.current = "left";
       setSideTimeRemaining(exercise.duration / 2);
     } else {
       setCurrentSide("both");
+      currentSideRef.current = "both";
       setSideTimeRemaining(0);
     }
     setIsPlaying(false);
@@ -670,9 +683,11 @@ export default function HabitTrackerPage() {
       const nextExercise = updatedRoutine.exercises[currentExerciseIndex + 1];
       if (nextExercise.isSided) {
         setCurrentSide("left");
+        currentSideRef.current = "left";
         setSideTimeRemaining(nextExercise.duration / 2);
       } else {
         setCurrentSide("both");
+        currentSideRef.current = "both";
         setSideTimeRemaining(0);
       }
     } else {
@@ -789,6 +804,7 @@ export default function HabitTrackerPage() {
       const exercise = activeRoutine.exercises[currentExerciseIndex];
       if (exercise.isSided) {
         setCurrentSide("left");
+        currentSideRef.current = "left";
         setSideTimeRemaining(exercise.duration / 2);
       }
       setIsPlaying(false);
@@ -1664,7 +1680,7 @@ function SideIndicator({
   return (
     <motion.div
       animate={{ scale: active ? 1.1 : 1 }}
-      className={`w-20 p-2 border-2 text-center transition-all ${
+      className={`w-22 p-2 border-2 text-center transition-all ${
         active
           ? "border-[#00ff41] bg-[#00ff41] text-[#0d0d1a]"
           : "border-[#333] bg-[#0d0d1a] text-[#666]"
@@ -1674,7 +1690,7 @@ function SideIndicator({
         className="text-sm font-bold mb-1"
         style={{ fontFamily: '"Press Start 2P", monospace' }}
       >
-        {side === "left" ? "◀ LEFT" : "RIGHT ▶"}
+        {side === "left" ? "◀ LEFT" : "▶ RIGHT"}
       </div>
       <div
         className="text-lg font-bold mb-1"
