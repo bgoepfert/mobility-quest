@@ -6,6 +6,7 @@ const STORAGE_KEYS = {
   NOTIFICATIONS: 'mobility-quest-notifications',
   DAILY_COMPLETIONS: 'mobility-quest-daily-completions',
   NOTIFICATION_STATE: 'mobility-quest-notification-state',
+  LAST_RESET: 'mobility-quest-last-reset',
 } as const;
 
 export function getStorage<T>(key: string, defaultValue: T): T {

@@ -273,7 +273,17 @@ const ACHIEVEMENTS = [
 
 function getTodayDateString(): string {
   const today = new Date();
-  return today.toISOString().split("T")[0];
+  const year = today.getFullYear();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function resetRoutineExercises(routine: Routine): Routine {
+  return {
+    ...routine,
+    exercises: routine.exercises.map((e) => ({ ...e, completed: false })),
+  };
 }
 
 function calculateStreak(dailyCompletions: string[]): number {
@@ -417,6 +427,20 @@ export default function HabitTrackerPage() {
       STORAGE_KEYS.ROUTINES,
       { morning: MORNING_ROUTINE, night: NIGHT_ROUTINE }
     );
+
+    // Check for daily reset
+    const lastReset = getStorage<string>(STORAGE_KEYS.LAST_RESET, "");
+    const today = getTodayDateString();
+
+    let morning = storedRoutines.morning;
+    let night = storedRoutines.night;
+
+    if (lastReset !== today) {
+      morning = resetRoutineExercises(morning);
+      night = resetRoutineExercises(night);
+      setStorage(STORAGE_KEYS.LAST_RESET, today);
+    }
+
     const storedProfile = getStorage<UserProfile>(STORAGE_KEYS.PROFILE, {
       totalPoints: 0,
       level: 1,
@@ -447,13 +471,32 @@ export default function HabitTrackerPage() {
       longestStreak: Math.max(storedProfile.longestStreak, currentStreak),
     };
 
-    setMorningRoutine(storedRoutines.morning);
-    setNightRoutine(storedRoutines.night);
+    setMorningRoutine(morning);
+    setNightRoutine(night);
     setUserProfile(updatedProfile);
     setAchievements(storedAchievements);
     setNotificationSettings(storedNotifications);
     setIsInitialized(true);
   }, []);
+
+  // Daily Reset Timer
+  useEffect(() => {
+    if (!isInitialized) return;
+
+    const checkDailyReset = () => {
+      const lastReset = getStorage<string>(STORAGE_KEYS.LAST_RESET, "");
+      const today = getTodayDateString();
+
+      if (lastReset !== today) {
+        setMorningRoutine((prev) => resetRoutineExercises(prev));
+        setNightRoutine((prev) => resetRoutineExercises(prev));
+        setStorage(STORAGE_KEYS.LAST_RESET, today);
+      }
+    };
+
+    const interval = setInterval(checkDailyReset, 60000); // Check every minute
+    return () => clearInterval(interval);
+  }, [isInitialized]);
 
   useEffect(() => {
     if (!isInitialized) return;
