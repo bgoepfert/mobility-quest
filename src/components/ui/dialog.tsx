@@ -1,3 +1,5 @@
+// Update the Dialog component to support the countdown
+
 "use client"
 
 import * as React from "react"
