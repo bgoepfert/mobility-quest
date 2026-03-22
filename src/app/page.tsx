@@ -16,24 +16,26 @@ function Page() {
   // Existing state declarations
   const [isCountdownActive, setIsCountdownActive] = useState(false);
   const [countdownTime, setCountdownTime] = useState(5);
+  const [isPaused, setIsPaused] = useState(false);
 
   // Effect to handle countdown
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (isCountdownActive && countdownTime > 0) {
+    if (isCountdownActive && countdownTime > 0 && !isPaused) {
       timer = setTimeout(() => {
-        setCountdownTime(countdownTime - 1);
+        setCountdownTime(prev => prev - 1);
       }, 1000);
     } else if (countdownTime === 0) {
       setIsCountdownActive(false);
     }
     return () => clearTimeout(timer);
-  }, [countdownTime, isCountdownActive]);
+  }, [countdownTime, isCountdownActive, isPaused]);
 
   // Function to start the countdown
   const startCountdown = () => {
     setIsCountdownActive(true);
     setCountdownTime(5);
+    setIsPaused(false);
   };
 
   return (
@@ -47,8 +49,8 @@ function Page() {
             <DialogDescription>Prepare to switch sides in {countdownTime} seconds.</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <button onClick={() => setIsCountdownActive(false)} className="btn">
-              Cancel Countdown
+            <button onClick={() => setIsPaused(prev => !prev)} className="btn">
+              {isPaused ? 'Resume' : 'Pause'} Countdown
             </button>
           </DialogFooter>
         </DialogContent>
