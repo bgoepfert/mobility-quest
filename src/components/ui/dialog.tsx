@@ -5,6 +5,7 @@ import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { XIcon } from "lucide-react"
 
 import { cn } from "@/lib/utils"
+import Countdown from "./countdown"
 
 function Dialog({
   ...props
@@ -129,6 +130,14 @@ function DialogDescription({
   )
 }
 
+const CountdownDialog: React.FC<{ onComplete: () => void }> = ({ onComplete }) => (
+  <Dialog open>
+    <DialogContent showCloseButton={false}>
+      <Countdown seconds={5} onComplete={onComplete} />
+    </DialogContent>
+  </Dialog>
+);
+
 export {
   Dialog,
   DialogClose,
@@ -140,4 +149,5 @@ export {
   DialogPortal,
   DialogTitle,
   DialogTrigger,
+  CountdownDialog,
 }
